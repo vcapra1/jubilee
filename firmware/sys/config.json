@@ -1,0 +1,140 @@
+{
+    "name": "Jubilee",
+    "network": {
+        "ip": "192.168.0.11",
+        "gateway": "192.168.0.255",
+        "netmask": "255.255.255.0"
+    },
+    "debug": false,
+    "motion": {
+        "X": [0],
+        "Y": [1],
+        "Z": [6, 7, 8],
+        "U": [2],
+        "flipped": [2]
+    },
+    "tools": [
+        {
+            "idx": 0,
+            "name": "Extruder 0",
+            "short": "E0",
+            "type": "extruder",
+            "driver": 0,
+            "heater": 3,
+            "fan": 3,
+            "sink_fan": 0,
+            "temp": {
+                "type": "thermistor",
+                "h": 0,
+                "l": 0,
+                "max": 285,
+                "standby": 165,
+                "active": 180
+            },
+            "offset": [0.0, 0.0, -3.02],
+            "location": {
+                "park": [284, 365],
+                "approach_offset_y": 45,
+                "wipe": [320, 360]
+            },
+            "pressure_advance": 0.1
+        },
+        {
+            "idx": 1,
+            "name": "Extruder 1",
+            "short": "E1",
+            "type": "extruder",
+            "driver": 1,
+            "heater": 4,
+            "fan": 4,
+            "sink_fan": 1,
+            "temp": {
+                "type": "thermistor",
+                "h": 0,
+                "l": 0,
+                "max": 285,
+                "standby": 165,
+                "active": 180
+            },
+            "offset": [0.78, -1.47, -4.07],
+            "location": {
+                "park": [11, 365],
+                "approach_offset_y": 45,
+                "wipe": [320, 360]
+            },
+            "pressure_advance": 0.1
+        }
+    ],
+    "geometry": {
+        "balls": [
+            [295, 316],
+            [0, 316],
+            [147.5, -14]
+        ],
+        "shape": {
+            "X": [-7, 302],
+            "Y": [0, 365],
+            "Z": [-0.5, 220],
+            "U": [0, 180]
+        }
+    },
+    "bed": {
+        "temp": {
+            "h": 0,
+            "l": 0,
+            "max": 120
+        },
+        "tuning": "M307 H0 A218.1 C369.1 D3.5 S1.00 V24.3 B0",
+        "probe": [
+            [147.5, 42],
+            [290, 300],
+            [0, 300]
+        ]
+    },
+    "motors": {
+        "microstepping": {
+            "X": 16,
+            "Y": 16,
+            "Z": 16,
+            "E": 16,
+            "U": 4,
+            "interpolation": true
+        },
+        "currents": {
+            "X": 1800,
+            "Y": 1800,
+            "Z": 1600,
+            "E": 1250,
+            "U": 900,
+            "idle": 60
+        },
+        "accelerations": {
+            "X": 1300,
+            "Y": 1300,
+            "Z": 20,
+            "E": 1300,
+            "U": 1000
+        },
+        "max_speeds": {
+            "X": 20000,
+            "Y": 20000,
+            "Z": 800,
+            "E": 8000,
+            "U": 10000
+        },
+        "max_jerks": {
+            "X": 1400,
+            "Y": 1400,
+            "Z": 2,
+            "E": 3000,
+            "U": 200
+        },
+        "steps_per_mm": {
+            "X": 200,
+            "Y": 200,
+            "Z": 800,
+            "E": 837,
+            "U": 11.429
+        }
+    }
+}

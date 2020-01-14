@@ -1,0 +1,284 @@
+task :config do
+    require 'time'
+    require 'json'
+
+    config = JSON.parse File.read "config.json"
+
+    $config_file = []
+
+    def write line="", comment=nil
+        $config_file << [line, comment]
+    end
+
+    def section name
+        write
+        write ";" * (name.length + 3)
+        write ";; #{name}"
+        write
+    end
+
+    def gen_config lines
+        result = ""
+        longest = 0
+        lines.each do |l|
+            line = l[0]
+            comment = l[1]
+            if line.length > longest and line[0] != ";"
+                longest = line.length
+            end
+        end
+
+        comment_offset = longest + 2
+
+        lines.each do |l|
+            line = l[0]
+            comment = l[1]
+            if comment
+                result << line + (" " * (comment_offset - line.length)) + "; " + comment + "\n"
+            else
+                result << line + "\n"
+            end
+        end
+
+        result
+    end
+        
+    section "Jubilee Config File - Auto-Generated on #{Time.now.utc.strftime("%d %h %Y at %H:%M:%S UTC")} by Vinnie Caprarola."
+
+    section "Name and Identification"
+    write "M550 P\"#{config["name"]}\"", "Machine and Netbios name"
+
+    section "Networking"
+    write "M552 S1 P#{config["network"]["ip"]}", "Use Ethernet with static IP"
+    write "M554 #{config["network"]["gateway"]}", "Gateway" if config["network"]["gateway"]
+    write "M553 P#{config["network"]["netmask"]}", "Netmask" if config["network"]["netmask"]
+
+    section "Debugging"
+    if config["debug"]
+        write "M111 S1", "Debug on"
+    else
+        write "M111 S0", "Debug off"
+    end
+    write "M929 P\"eventlog.txt\" S1", "Start logging to file"
+
+    section "General Preferences"
+    write "M555 P2", "Set Marlin-style output"
+    write "G21", "Set dimensions to millimeters"
+    write "G90", "Send absolute coordinates"
+    write "M83", "Relative extruder moves"
+
+    section "Joints"
+    es = config["tools"].map { |t| t["driver"] + 3 }
+    write "M584 X#{config["motion"]["X"].join(":")} Y#{config["motion"]["Y"].join(":")} Z#{config["motion"]["Z"].join(":")} E#{es.join(":")} U#{config["motion"]["U"].join(":")}", "Map axes to their driver(s), and toolchanger to U-axis"
+
+    for ax in ["X", "Y", "Z", "U"] do
+        config["motion"][ax].each do |d|
+            if ax == "U"
+                ax = "Toolchanger actuator"
+            end
+
+            if config["motion"]["flipped"].include? d
+                dir = 1
+            else
+                dir = 0
+            end
+            write "M569 P#{d} S#{dir}", "Drive #{d} direction | #{ax} stepper"
+        end
+    end
+
+    config["tools"].each do |t|
+        d = t["driver"] + 3
+        dir = 1
+        write "M569 P#{d} S#{dir}", "Drive #{d} direction | #{t["name"]} stepper"
+    end
+
+    write "M669 K1", "CoreXY mode"
+    write "M671 X#{config["geometry"]["balls"].map { |b| b[0] }.join(":")} Y#{config["geometry"]["balls"].map { |b| b[1] }.join(":")} S5", "Kinematic bed ball locations (Max correction of 5)"
+
+    section "Advanced Motor Configuration"
+    if config["motors"]["microstepping"]["interpolation"]
+        i = 1
+    else
+        i = 0
+    end
+    write "M350 X#{config["motors"]["microstepping"]["X"]} Y#{config["motors"]["microstepping"]["Y"]} Z#{config["motors"]["microstepping"]["Z"]} E#{config["motors"]["microstepping"]["E"]} U#{config["motors"]["microstepping"]["U"]} I#{i}", "Specify microstepping settings and whether to use interpolation"
+    write "M574 X1 Y1 Z1 S1", "All 3 axes are low-end endstops, and are active-high"
+    write "M574 U1 S1", "Toolchanger endstops (in series) are active-high"
+    write "M906 X#{config["motors"]["currents"]["X"]} Y#{config["motors"]["currents"]["Y"]} Z#{config["motors"]["currents"]["Z"]} E#{config["motors"]["currents"]["E"]} U#{config["motors"]["currents"]["U"]} I#{config["motors"]["currents"]["idle"]}", "Motor currents (mA)"
+    write "M201 X#{config["motors"]["accelerations"]["X"]} Y#{config["motors"]["accelerations"]["Y"]} Z#{config["motors"]["accelerations"]["Z"]} E#{config["motors"]["accelerations"]["E"]} U#{config["motors"]["accelerations"]["U"]}", "Motor accelerations (mm/s^2)"
+    write "M203 X#{config["motors"]["max_speeds"]["X"]} Y#{config["motors"]["max_speeds"]["Y"]} Z#{config["motors"]["max_speeds"]["Z"]} E#{config["motors"]["max_speeds"]["E"]} U#{config["motors"]["max_speeds"]["U"]}", "Motor max speeds (mm/min)"
+    write "M566 X#{config["motors"]["max_jerks"]["X"]} Y#{config["motors"]["max_jerks"]["Y"]} Z#{config["motors"]["max_jerks"]["Z"]} E#{config["motors"]["max_jerks"]["E"]} U#{config["motors"]["max_jerks"]["U"]}", "Motor max jerk speeds"
+
+    section "Geometry"
+
+    write "M92 X#{config["motors"]["steps_per_mm"]["X"]} Y#{config["motors"]["steps_per_mm"]["Y"]} Z#{config["motors"]["steps_per_mm"]["Z"]} E#{config["motors"]["steps_per_mm"]["E"]} U#{config["motors"]["steps_per_mm"]["U"]}", "Motor steps/mm"
+    write "M208 X#{config["geometry"]["shape"]["X"].join(":")} Y#{config["geometry"]["shape"]["Y"].join(":")} Z#{config["geometry"]["shape"]["Z"].join(":")} U#{config["geometry"]["shape"]["U"].join(":")}", "Software limits for axis movements"
+    
+    section "Thermistors"
+    
+    write "M305 P0 S\"Bed\" T100000 B3950 R4700 H#{config["bed"]["temp"]["h"]} L#{config["bed"]["temp"]["l"]}", "Bed thermistor values"
+    config["tools"].each do |t|
+        if t["temp"]["type"] == "thermistor"
+            write "M305 P#{t["heater"]} S\"#{t["short"]}\" T100000 B4725 C7.06e-8 R4700 H#{t["temp"]["h"]} L#{t["temp"]["l"]}", "#{t["name"]} sensor maps to thermistor"
+        elsif t["temp"]["type"] == "pt100"
+            write "M305 P#{t["heater"]} X#{t["idx"] + 200}", "#{t["name"]} sensor maps to PT100 Channel #{t["idx"]}"
+        end
+    end
+
+    section "Heaters"
+
+    write "M143 H0 S#{config["bed"]["temp"]["max"]}", "Bed max temp"
+    config["tools"].each do |t|
+        write "M143 H#{t["heater"]} S#{t["temp"]["max"]}", "#{t["name"]} max temp"
+    end
+
+    write config["bed"]["tuning"], "Bed heater params"
+
+    section "Tools"
+
+    config["tools"].each do |t|
+        case t["type"]
+        when "extruder"
+            write "M563 P#{t["idx"]} S\"#{t["name"]}\" D#{t["driver"]} H#{t["heater"]} F#{t["fan"]}", "Define #{t["name"]}"
+            write "G10 P#{t["idx"]} X#{t["offset"][0]} Y#{t["offset"][1]} Z#{t["offset"][2]}", "Set offsets for #{t["name"]}"
+            write "G10 P#{t["idx"]} S#{t["temp"]["active"]} R#{t["temp"]["standby"]}", "Set temperatures (active and standby) for #{t["name"]}"
+            write "M572 D#{t["idx"]} S#{t["pressure_advance"]}", "Set pressure advance on #{t["name"]}"
+        end
+    end
+
+    section "Fans"
+
+    config["tools"].each do |t|
+        write "M106 P#{t["fan"]} S0 C\"#{t["name"]} Fan\"", "Set name for #{t["name"]} fan and turn off"
+    end
+
+    config["tools"].each do |t|
+        write "M106 P#{t["sink_fan"]} T45 H#{t["heater"]}", "Enable thermostatic control for fan #{t["sink_fan"]}"
+    end
+
+    section "Z Probe"
+
+    write "M558 P4 C2 H2 A1 T3000 S0.02", "Z probe - raise probe height"
+
+    section "Misc"
+
+    write "M98 P\"config-user.g\"", "Load custom user config"
+    write "M501", "Load saved params from non-volatile memory"
+
+    f = File.open("config.g", "w")
+    f.write (gen_config $config_file)
+end
+
+task :bed do
+    require 'time'
+    require 'json'
+
+    config = JSON.parse File.read "config.json"
+
+    points = config["bed"]["probe"]
+
+    file = "M401 ; Deploy probe\n"
+
+    i = 0
+    for point in points do
+        file << "G0 X#{point[0]} Y#{point[1]} S1 F20000 ; move to next point\n"
+        if i == points.length - 1 then
+            file << "G30 P#{i} X#{point[0]} Y#{point[1]} Z-99999 S3 ; probe at current location and calibrate motors\n"
+        else
+            file << "G30 P#{i} X#{point[0]} Y#{point[1]} Z-99999 ; probe at current location\n"
+        end
+
+        i += 1
+    end
+
+    file << "M402 ; Retract probe\n"
+    file << "G1 X0 Y0 F20000 ; Go home\n"
+
+    f = File.open("bed.g", "w")
+    f.write file
+end
+
+task :tools do
+    require 'time'
+    require 'json'
+
+    config = JSON.parse File.read "config.json"
+    tools = config["tools"]
+
+    tools.each do |tool|
+        # tpreN.g
+        file = "; Runs after freeing the previous tool if the next tool is #{tool["name"]}.\n"
+        file << "; NOTE: tool offsets are NOT applied at this point!\n"
+
+        file << "G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to tool park location\n"
+        file << "G60 S2 ; Save this position as the reference point from which to later apply new tool offsets"
+
+        f = File.open("tpre#{tool["idx"]}.g", "w")
+        f.write file
+
+        # tpostN.g
+        file = "; Runs after firmware thinks #{tool["name"]} is selected\n"
+        file << "; NOTE: tool offsets ARE applied at this point!\n"
+
+        file << "M116 P#{tool["idx"]} ; Wait for set temps to be reached\n"
+        file << "G53 G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to tool park location (if for some reason we aren't there already)\n"
+        file << "M302 P0 ; Prevent cold extrusion\n"
+        file << "G1 E5 F200 ; Purge the nozzle\n"
+        file << "G1 E5 F100 ; Purge the nozzle, but slower\n"
+        file << "G4 S1 ; wait a second\n"
+        file << "G1 E-1.0 F2000 ; Retract to relieve filament pressure\n"
+        file << "G53 G1 Y#{tool["location"]["park"][1]} F10000 ; move to pickup position\n"
+        file << "M98 P\"/macros/tool_lock.g\" ; lock the tool\n"
+        file << "G53 G1 Y#{tool["location"]["wipe"][0]} F6000 ; Retract the entire tool, and wipe back\n"
+        file << "G53 G1 Y#{tool["location"]["wipe"][1]} F10000 ; Wipe forwards\n"
+        file << "G53 G1 Y#{tool["location"]["wipe"][0]} F10000 ; Wipe backwards\n"
+        file << "G53 G1 Y#{tool["location"]["wipe"][1]} F10000 ; Wipe forwards\n"
+        file << "G53 G1 Y#{tool["location"]["wipe"][0]} F10000 ; Wipe backwards\n"
+        file << "G1 R2 X0 Y0 Z0 ; Restore prior position, accounting for new offset\n"
+        file << "M106 R2 ; restore prior print cooling fan speed\n"
+
+        f = File.open("tpost#{tool["idx"]}.g", "w")
+        f.write file
+
+        # tfreeN.g
+        file = "; Runs at the start of a toolchange if the current tool is #{tool["name"]}.\n"
+        file << "; NOTE: tool offsets ARE applied at this point!\n"
+
+        file << "G53 G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to park location\n"
+        file << "G53 G1 Y#{tool["location"]["park"][1] - 1} F10000 ; Controlled move to park location (minus 1 so as to not go too far)\n"
+        file << "M98 P\"/macros/tool_unlock.g\" ; unlock the tool\n"
+        file << "G53 G1 Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F6000 ; Retract the pin\n"
+
+        f = File.open("tfree#{tool["idx"]}.g", "w")
+        f.write file
+    end
+end
+
+task :stop do
+    require 'time'
+    require 'json'
+
+    config = JSON.parse File.read "config.json"
+    tools = config["tools"]
+
+    file = "; Run at end of print, or after a job is canceled\n"
+    file << "M83 ; Relative extruder moves\n"
+    file << "G1 E-10 F8000 ; rapid retract 10mm\n"
+    file << "G91 ; relative moves\n"
+    file << "G1 Z2 F1000 ; raise nozzle\n"
+    file << "G90 ; absolute moves\n"
+    file << "T-1 ; deselect tool\n"
+    file << "G0 X10 Y2 F20000 ; go home\n"
+    
+    tools.each do |tool|
+        file << "G10 P#{tool["idx"]} R-273.15 S-273.15 ; disable heater for #{tool["name"]}\n"
+    end
+
+    file << "M140 S-273.15 ; disable bed heater\n"
+    file << "M84 ; disable steppers\n"
+
+    f = File.open("stop.g", "w")
+    f.write file
+end
+
+task :default => [:config, :tools, :bed, :stop]
