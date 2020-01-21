@@ -132,8 +132,6 @@ task :config do
         write "M143 H#{t["heater"]} S#{t["temp"]["max"]}", "#{t["name"]} max temp"
     end
 
-    write config["bed"]["tuning"], "Bed heater params"
-
     section "Tools"
 
     config["tools"].each do |t|
@@ -210,7 +208,8 @@ task :tools do
         file = "; Runs after freeing the previous tool if the next tool is #{tool["name"]}.\n"
         file << "; NOTE: tool offsets are NOT applied at this point!\n"
 
-        file << "G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to tool park location\n"
+        file << "G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["far_approach_offset_y"]} F25000 ; Rapid approach to tool park location\n"
+        file << "G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to tool park location (closer this time)\n"
         file << "G60 S2 ; Save this position as the reference point from which to later apply new tool offsets"
 
         f = File.open("tpre#{tool["idx"]}.g", "w")
@@ -221,12 +220,12 @@ task :tools do
         file << "; NOTE: tool offsets ARE applied at this point!\n"
 
         file << "M116 P#{tool["idx"]} ; Wait for set temps to be reached\n"
-        file << "G53 G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to tool park location (if for some reason we aren't there already)\n"
+        file << "G53 G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to tool park location (the closer one)\n"
         file << "M302 P0 ; Prevent cold extrusion\n"
         file << "G1 E5 F200 ; Purge the nozzle\n"
         file << "G1 E5 F100 ; Purge the nozzle, but slower\n"
         file << "G4 S1 ; wait a second\n"
-        file << "G1 E-1.0 F2000 ; Retract to relieve filament pressure\n"
+        file << "G1 E-2.0 F2000 ; Retract to relieve filament pressure\n"
         file << "G53 G1 Y#{tool["location"]["park"][1]} F10000 ; move to pickup position\n"
         file << "M98 P\"/macros/tool_lock.g\" ; lock the tool\n"
         file << "G53 G1 Y#{tool["location"]["wipe"][0]} F6000 ; Retract the entire tool, and wipe back\n"
@@ -237,6 +236,8 @@ task :tools do
         file << "G1 R2 X0 Y0 Z0 ; Restore prior position, accounting for new offset\n"
         file << "M106 R2 ; restore prior print cooling fan speed\n"
 
+        file << "G1 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["far_approach_offset_y"]} F25000 ; Move back to subsequent moves clear other tools\n"
+
         f = File.open("tpost#{tool["idx"]}.g", "w")
         f.write file
 
@@ -244,10 +245,11 @@ task :tools do
         file = "; Runs at the start of a toolchange if the current tool is #{tool["name"]}.\n"
         file << "; NOTE: tool offsets ARE applied at this point!\n"
 
-        file << "G53 G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F25000 ; Rapid approach to park location\n"
+        file << "G53 G0 X#{tool["location"]["park"][0]} Y#{tool["location"]["park"][1] - tool["location"]["far_approach_offset_y"]} F25000 ; Rapid approach to park location\n"
         file << "G53 G1 Y#{tool["location"]["park"][1] - 1} F10000 ; Controlled move to park location (minus 1 so as to not go too far)\n"
         file << "M98 P\"/macros/tool_unlock.g\" ; unlock the tool\n"
-        file << "G53 G1 Y#{tool["location"]["park"][1] - tool["location"]["approach_offset_y"]} F6000 ; Retract the pin\n"
+        file << "G53 G1 Y#{tool["location"]["park"][1] - tool["location"]["far_approach_offset_y"]} F6000 ; Retract the pin\n"
+        file << "M106 P#{tool["fan"]} S0 ; turn off fan\n"
 
         f = File.open("tfree#{tool["idx"]}.g", "w")
         f.write file

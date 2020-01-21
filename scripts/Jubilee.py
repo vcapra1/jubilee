@@ -80,7 +80,9 @@ class Jubilee(Script):
                             lines_modified.append("M104 T{} S{} ; heat tool".format(tool, initial_tool_temps[tool]))
 
                         if initial_bed_temp > 0:
+                            lines_modified.append("M118 P3 S\"Waiting for bed to reach temperature...\"")
                             lines_modified.append("M190 S{} ; wait for bed to finish heating".format(initial_bed_temp))
+                            lines_modified.append("M118 P3 S\"Waiting for bed to finish thermally expanding...\"")
                             lines_modified.append("G4 S60 ; wait an additional 60 seconds to allow plate to finish thermally expanding")
 
                         lines_modified.append("G28 ; home after bed has reached temperature")
