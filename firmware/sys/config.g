@@ -1,6 +1,6 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-;; Jubilee Config File - Auto-Generated on 20 Jan 2020 at 15:13:48 UTC by Vinnie Caprarola.
+;; Jubilee Config File - Auto-Generated on 06 Dec 2020 at 20:28:29 UTC by Vinnie Caprarola.
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -83,7 +83,7 @@ G10 P0 X0.0 Y0.0 Z-2.89                           ; Set offsets for Extruder 0
 G10 P0 S180 R165                                  ; Set temperatures (active and standby) for Extruder 0
 M572 D0 S0.1                                      ; Set pressure advance on Extruder 0
 M563 P1 S"Extruder 1" D1 H4 F4                    ; Define Extruder 1
-G10 P1 X-1.3 Y1.1 Z-2.5                           ; Set offsets for Extruder 1
+G10 P1 X-1.3 Y1.1 Z-2.58                          ; Set offsets for Extruder 1
 G10 P1 S180 R165                                  ; Set temperatures (active and standby) for Extruder 1
 M572 D1 S0.1                                      ; Set pressure advance on Extruder 1
 
