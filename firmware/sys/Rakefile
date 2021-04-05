@@ -317,5 +317,8 @@ task :cancel do
     f = File.open "cancel.g", "w"
 end
 
+task :clean do
+    `rm *.g`
+end
 
 task :default => [:config, :homeall, :homeu, :homex, :homey, :homez, :bed, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel]
