@@ -138,9 +138,9 @@ module Config
         HE_ON_TEMP = 45
     end
 
-    module Nozzles
+    module Tools
         # Note: offset is from the Z probe
-        OFFSETS = [
+        NOZZLE_OFFSETS = [
             {X: -5, Y: 44, Z: 0}, # E1
             {X: -5, Y: 44, Z: 0}, # E2
             {X: -5, Y: 44, Z: 0}, # E3

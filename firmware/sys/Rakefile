@@ -53,10 +53,8 @@ def blank
 end
 
 task :config do
-    config = JSON.parse File.read "config.json"
     f = File.open "config.g", "w"
 
-    f << blank
     f << comment("Jubilee Config File for RepRapFirmware 3")
 
     f << blank
@@ -181,7 +179,7 @@ task :config do
     #f << command("M574", Z: 0, P: "nil") # no Z endstop switch, free up endstop input
     f << command("M558",
                  P: 5,
-                 C: ENDSTOP_PIN_NAMES[Config::Endstops::Z::PIN],
+                 C: (Config::Endstops::Z::PULLUP ? "^" : "") + ENDSTOP_PIN_NAMES[Config::Endstops::Z::PIN],
                  H: Config::Bed::PROBE_DIVE,
                  A: 1,
                  T: Config::Bed::PROBE_SPEED,
@@ -239,9 +237,9 @@ task :config do
                      F: Config::Fans::PART_FAN_PINS[i])
         f << command("G10",                                   # Set tool offsets from z probe
                      P: i,
-                     X: Config::Nozzles::OFFSETS[i][:X],
-                     Y: Config::Nozzles::OFFSETS[i][:Y],
-                     Z: Config::Nozzles::OFFSETS[i][:Z])
+                     X: Config::Tools::NOZZLE_OFFSETS[i][:X],
+                     Y: Config::Tools::NOZZLE_OFFSETS[i][:Y],
+                     Z: Config::Tools::NOZZLE_OFFSETS[i][:Z])
         f << command("G10",                                   # Turn heater off
                      P: i,
                      S: -273,
@@ -257,4 +255,67 @@ task :config do
     f << command("M551", P: Config::Machine::PASSWORD) # Set password
 end
 
-task :default => [:config]#, :bed, :home, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel]
+task :homeall do
+    f = File.open "homeall.g", "w"
+end
+
+task :homeu do
+    f = File.open "homeu.g", "w"
+end
+
+task :homex do
+    f = File.open "homex.g", "w"
+end
+
+task :homey do
+    f = File.open "homey.g", "w"
+end
+
+task :homez do
+    f = File.open "homez.g", "w"
+end
+
+task :bed do
+    f = File.open "bed.g", "w"
+end
+
+task :pause do
+    f = File.open "pause.g", "w"
+end
+
+task :resume do
+    f = File.open "resume.g", "w"
+end
+
+task :start do
+    f = File.open "start.g", "w"
+end
+
+task :stop do
+    f = File.open "stop.g", "w"
+end
+
+task :tfree do
+    for i in 0...Config::Machine::N_TOOLS
+        f = File.open "tfree#{i}.g", "w"
+    end
+end
+
+task :tpre do
+    for i in 0...Config::Machine::N_TOOLS
+        f = File.open "tpre#{i}.g", "w"
+    end
+end
+
+task :tpost do
+    for i in 0...Config::Machine::N_TOOLS
+        f = File.open "tpost#{i}.g", "w"
+    end
+end
+
+task :cancel do
+    f = File.open "cancel.g", "w"
+end
+
+
+task :default => [:config, :homeall, :homeu, :homex, :homey, :homez, :bed, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel]

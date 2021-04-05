@@ -1,4 +1,3 @@
-
 ;; Jubilee Config File for RepRapFirmware 3
 
 ;; Name and Identification
@@ -55,7 +54,7 @@ M574 X1 S1 P"^zstop"
 M574 X1 S1 P"^e0stop"
 
 ;; Z Probe
-M558 P5 C"zstop" H5 A1 T3000 S0.02
+M558 P5 C"^zstop" H5 A1 T3000 S0.02
 
 ;; Bed Heater
 M308 S0 P"bedtemp" T100000 B3950 R4700
