@@ -8,5 +8,7 @@ T-1 ; deselect tool
 G0 X10 Y2 F20000 ; go home
 G10 P0 R-273.15 S-273.15 ; disable heater for Extruder 0
 G10 P1 R-273.15 S-273.15 ; disable heater for Extruder 1
+G10 P2 R-273.15 S-273.15 ; disable heater for Extruder 2
+G10 P3 R-273.15 S-273.15 ; disable heater for Extruder 3
 M140 S-273.15 ; disable bed heater
 M84 ; disable steppers

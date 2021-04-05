@@ -1,7 +1,7 @@
-; Runs after firmware thinks Extruder 0 is selected
+; Runs after firmware thinks Extruder 3 is selected
 ; NOTE: tool offsets ARE applied at this point!
-M116 P0 ; Wait for set temps to be reached
-G53 G0 X4 Y319 F10000 ; Rapid approach to tool park location (the closer one)
+M116 P3 ; Wait for set temps to be reached
+G53 G0 X279 Y319 F10000 ; Rapid approach to tool park location (the closer one)
 M302 P0 ; Prevent cold extrusion
 G1 E5 F200 ; Purge the nozzle
 G1 E5 F100 ; Purge the nozzle, but slower
@@ -19,4 +19,4 @@ G53 G1 Y360 F10000 ; Wipe forwards
 G53 G1 Y320 F10000 ; Wipe backwards
 G1 R2 X0 Y0 Z0 ; Restore prior position, accounting for new offset
 M106 R2 ; restore prior print cooling fan speed
-G1 X4 Y290 F10000 ; Move back to subsequent moves clear other tools
+G1 X279 Y290 F10000 ; Move back to subsequent moves clear other tools
