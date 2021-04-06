@@ -13,11 +13,16 @@ module Config
     end
 
     module Bed
-        BALLS_X = [286, -9, 138.5]
-        BALLS_Y = [316, 316, -14]
+        BALLS_X = [292, 0, 146]
+        BALLS_Y = [311, 311, -19]
+        PROBE_POINTS = [
+            {X: 146, Y: 5},
+            {X: 282, Y: 281},
+            {X: 10, Y: 281}
+        ]
         MAX_CORRECTION = 5
-        MESH_X_BOUNDS = [0, 280]
-        MESH_Y_BOUNDS = [5, 285]
+        MESH_X_BOUNDS = [10, 282]
+        MESH_Y_BOUNDS = [5, 281]
         MESH_SIZE = 10
         PROBE_DIVE = 5
         PROBE_SPEED = 3000
@@ -35,7 +40,7 @@ module Config
             MAX_SPEED = 15000 # mm/min
             MAX_ACCEL = 1000 # mm/s^2
             MAX_JERK = 500 # instantaneous change in mm/min
-            SOFT_LIMITS = [-16, 281]
+            SOFT_LIMITS = [-9, 301]
         end
         module Y
             NUMBER = 1
@@ -46,7 +51,7 @@ module Config
             MAX_SPEED = 15000
             MAX_ACCEL = 1000
             MAX_JERK = 500
-            SOFT_LIMITS = [0, 364]
+            SOFT_LIMITS = [-44, 320]
         end
         module Z
             NUMBERS = [7, 8, 9]
@@ -72,14 +77,14 @@ module Config
         end
         module U
             NUMBER = 2
-            DIR = 0
+            DIR = 1
             MICROSTEPPING = 4
-            STEPS_PER_DEG = 11.429
+            STEPS_PER_DEG = 30.578
             MAX_CURRENT = 900
             MAX_SPEED = 10000
             MAX_ACCEL = 1000
             MAX_JERK = 200
-            SOFT_LIMITS = [0, 180]
+            SOFT_LIMITS = [0, 200]
         end
     end
 
@@ -146,6 +151,21 @@ module Config
             {X: -5, Y: 44, Z: 0}, # E3
             {X: -5, Y: 44, Z: 0}  # E4
         ]
+
+        PARKING_X = [11, 102.7, 194.3, 286]
+        PARKING_APPROACH_Y = 284
+        PARKING_Y = 320
+    end
+
+    module Speeds
+        # All speeds in mm/min unless otherwise noted
+        HOMING_XY = 3000
+        HOMING_Z = 500
+        PAUSE_XY = 3000
+        PAUSE_Z = 500
+        PAUSE_RETRACT = 2500
+        END_RETRACT = 8000
+        PARK_XY = 3000
     end
 end
 

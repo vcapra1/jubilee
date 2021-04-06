@@ -23,11 +23,17 @@ ENDSTOP_PIN_NAMES = [
     "duex.e3stop", "duex.e4stop", "duex.e5stop", "duex.e6stop"
 ]
 
-def format_arg(value)
-    if value.is_a? Numeric
+def format_arg(value, omit_quotes = false)
+    if value.nil?
+        return ""
+    elsif value.is_a? Numeric
         return "#{value}"
     elsif value.is_a? String
-        return "\"#{value.gsub('"', '""')}\""
+        if omit_quotes
+            return value
+        else
+            return "\"#{value.gsub('"', '""')}\""
+        end
     elsif value.is_a? Array
         return value.map{|x| format_arg(x)}.join(":")
     else
@@ -39,9 +45,17 @@ def command(cmd, args = {})
     command = cmd
     for key in args.keys
         value = args.fetch(key)
-        command += " #{key}#{format_arg(value)}"
+        if ["M552", "M553", "M554"].include? cmd
+            command += " #{key}#{format_arg(value, true)}"
+        else
+            command += " #{key}#{format_arg(value)}"
+        end
     end
     command + "\n"
+end
+
+def meta(header, *subcommands)
+    header + "\n  " + subcommands.join("").strip.gsub("\n", "\n  ") + "\n"
 end
 
 def comment(msg)
@@ -162,21 +176,21 @@ task :config do
                  S: 1,
                  P: (Config::Endstops::X::PULLUP ? "^" : "") + ENDSTOP_PIN_NAMES[Config::Endstops::X::PIN])
     f << command("M574",
-                 X: Config::Endstops::Y::POS,
+                 Y: Config::Endstops::Y::POS,
                  S: 1,
                  P: (Config::Endstops::Y::PULLUP ? "^" : "") + ENDSTOP_PIN_NAMES[Config::Endstops::Y::PIN])
     f << command("M574",
-                 X: Config::Endstops::Z::POS,
+                 Z: Config::Endstops::Z::POS,
                  S: 1,
                  P: (Config::Endstops::Z::PULLUP ? "^" : "") + ENDSTOP_PIN_NAMES[Config::Endstops::Z::PIN])
     f << command("M574",
-                 X: Config::Endstops::U::POS,
+                 U: Config::Endstops::U::POS,
                  S: 1,
                  P: (Config::Endstops::U::PULLUP ? "^" : "") + ENDSTOP_PIN_NAMES[Config::Endstops::U::PIN])
 
     f << blank
     f << comment("Z Probe")
-    #f << command("M574", Z: 0, P: "nil") # no Z endstop switch, free up endstop input
+    f << command("M574", Z: 0, P: "nil") # no Z endstop switch, free up endstop input
     f << command("M558",
                  P: 5,
                  C: (Config::Endstops::Z::PULLUP ? "^" : "") + ENDSTOP_PIN_NAMES[Config::Endstops::Z::PIN],
@@ -190,6 +204,7 @@ task :config do
     f << command("M308",                           # Define bed thermistor as sensor 0
                  S: Config::Thermistors::Bed::NUM,
                  P: TEMP_PIN_NAMES[Config::Thermistors::Bed::NUM],
+                 Y: "thermistor",
                  T: Config::Thermistors::Bed::T,
                  B: Config::Thermistors::Bed::B,
                  R: Config::Thermistors::Bed::R)
@@ -206,6 +221,7 @@ task :config do
         f << command("M308",                                                     # Define extruder thermistor
                      S: Config::Thermistors::Extruders::NUMS[i],
                      P: TEMP_PIN_NAMES[Config::Thermistors::Extruders::NUMS[i]],
+                     Y: "thermistor",
                      T: Config::Thermistors::Extruders::T,
                      B: Config::Thermistors::Extruders::B,
                      R: Config::Thermistors::Extruders::R)
@@ -232,7 +248,7 @@ task :config do
         f << command("M563",                                  # Define tool with drive, heater, part fan
                      P: i,
                      S: "Extruder #{i + 1}",
-                     D: Config::Drives::E::NUMBERS[i],
+                     D: i,
                      H: Config::Heaters::Extruders::NUMS[i],
                      F: Config::Fans::PART_FAN_PINS[i])
         f << command("G10",                                   # Set tool offsets from z probe
@@ -242,10 +258,10 @@ task :config do
                      Z: Config::Tools::NOZZLE_OFFSETS[i][:Z])
         f << command("G10",                                   # Turn heater off
                      P: i,
-                     S: -273,
-                     R: -273)
+                     S: -273.15,
+                     R: -273.15)
         f << command("M572",                                  # Pressure advance
-                     D: Config::Drives::E::NUMBERS[i],
+                     D: i,
                      S: Config::Drives::E::PRESSURE_ADVANCE)
     end
 
@@ -257,34 +273,208 @@ end
 
 task :homeall do
     f = File.open "homeall.g", "w"
+
+    f << command("G91")                    # relative moves
+    f << command("G1", Z: 5, F: 800, H: 2) # lift z
+    f << command("M98", P: "homeu.g")
+    f << command("M98", P: "homey.g")
+    f << command("M98", P: "homex.g")
+    f << command("M98", P: "homez.g")
 end
 
 task :homeu do
     f = File.open "homeu.g", "w"
+
+    f << command("G90")                        # absolute moves
+    f << command("G92", U: 0)                  # set curr pos as 0
+    f << command("G1", U: 5, H: 2, F: 5000)    # move 2 degrees off switch
+    f << command("G1", U: 120, H: 1, F: 5000)  # move to 170deg, or until switch is triggered
+    f << command("M400")                       # wait for move to complete
+
+    f << meta("if abs(move.axes[3].userPosition - 120) > 1",
+              command("M84", U: nil),
+              command("M291",
+                      R: "Intervention Required",
+                      P: "Please remove the tool and return it to its post, and restore the twist lock to its horizontal position.  Press OK when done",
+                      S: 3))
+    f << command("T-1 P0")                     # deselect tool without moving
+
+    f << command("G91")                        # relative moves
+    f << command("G1", U: -360, F: 9000, H: 1) # go to endstop
+    f << command("G1", U: 6, F: 600)           # back off endstop
+    f << command("G1", U: -15, F: 600, H: 1)   # go to endstop slowly
+    f << command("G90")                        # absolute moves
 end
 
 task :homex do
     f = File.open "homex.g", "w"
+
+    f << command("G90") # absolute moves
+    f << meta("if !move.axes[3].homed",      # Make sure the lock actuator is homed
+              command("M291",
+                      R: "Cannot Home X",
+                      P: "U axis must be homed before X to prevent damage to tool. Press OK to home U or Cancel to abort",
+                      S: 3),
+              command("M98", P: "homeu.g"))
+    f << meta("if !move.axes[1].homed",      # Make sure the Y axis is homed
+              command("M291",
+                      R: "Cannot Home X",
+                      P: "Y axis must be homed before X to prevent damage to tool. Press OK to home Y or Cancel to abort",
+                      S: 3),
+              command("M98", P: "homey.g"))
+    f << meta("if move.axes[1].userPosition >= #{Config::Drives::Y::SOFT_LIMITS[1] - 20}",   # Make sure the head won't collide with parked tools
+              command("G0",
+                      Y: Config::Drives::Y::SOFT_LIMITS[1] - 20,
+                      F: Config::Speeds::HOMING_XY))
+    f << meta("if state.currentTool != -1",  # Make sure there is no active tool
+              command("M84", U: nil), # disable lock stepper
+              command("M291",
+                      R: "Cannot Home X",
+                      P: "Tool must be deselected before homing. The tool has been unlocked, manually dock it and press OK to continue or Cancel to abort",
+                      S: 3),
+              command("M98", P: "homeu.g"))
+    f << meta("if sensors.endstops[0].triggered",  # Make sure the endstop isn't already triggered (could be broken wire)
+              command("M291",
+                      R: "Cannot Home X",
+                      P: "X Endstop is already triggered!",
+                      S: 2),
+              meta("abort \"X Endstop was triggered before homing.\""))
+
+    f << command("G91") # Relative moves
+    f << command("G1",  # Go to endstop
+                 X: Config::Drives::X::SOFT_LIMITS[0] - Config::Drives::X::SOFT_LIMITS[1] - 20,
+                 F: Config::Speeds::HOMING_XY,
+                 H: 1)
+    f << command("G1",  # Back off endstop
+                 X: 4,
+                 F: Config::Speeds::HOMING_XY / 5)
+    f << command("G1",  # Go to endstop again, at slower speed
+                 X: -10,
+                 F: Config::Speeds::HOMING_XY / 5,
+                 H: 1)
+    f << command("G1",  # Relieve pressure from endstop
+                 X: 2,
+                 F: Config::Speeds::HOMING_XY / 5)
+    f << command("G90") # Absolute moves
 end
 
 task :homey do
     f = File.open "homey.g", "w"
+
+    f << meta("if sensors.endstops[1].triggered",  # Make sure the endstop isn't already triggered (could be broken wire)
+              command("M291",
+                      R: "Cannot Home Y",
+                      P: "Y Endstop is already triggered!",
+                      S: 2),
+              meta("abort \"Y Endstop was triggered before homing.\""))
+
+    f << command("G91") # Relative moves
+    f << command("G1",  # Go to endstop
+                 Y: Config::Drives::Y::SOFT_LIMITS[0] - Config::Drives::Y::SOFT_LIMITS[1] - 20,
+                 F: Config::Speeds::HOMING_XY,
+                 H: 1)
+    f << command("G1",  # Back off endstop
+                 Y: 4,
+                 F: Config::Speeds::HOMING_XY / 5)
+    f << command("G1",  # Go to endstop again, at slower speed
+                 Y: -10,
+                 F: Config::Speeds::HOMING_XY / 5,
+                 H: 1)
+    f << command("G1",  # Relieve pressure from endstop
+                 Y: 1,
+                 F: Config::Speeds::HOMING_XY / 5)
+    f << command("G90") # Absolute moves
 end
 
 task :homez do
     f = File.open "homez.g", "w"
+
+    f << meta("if !move.axes[3].homed", # check u
+              command("M291",
+                      R: "Cannot Home Z",
+                      P: "U axis must be homed before Z to prevent damage to tool. Press OK to home U or Cancel to abort",
+                      S: 3),
+              command("M98", P: "homeu.g"))
+    f << meta("if !move.axes[0].homed || !move.axes[1].homed", # must home x and y before z
+              command("M291",
+                      R: "Cannot Home Z",
+                      P: "X and Y axes must be homed before Z for probing. Press OK to home X and Y or Cancel to abort",
+                      S: 3),
+              command("M98", P: "homey.g"),
+              command("M98", P: "homex.g"))
+    f << meta("if state.currentTool != -1",  # Make sure there is no active tool
+              command("M84", U: nil), # disable lock stepper
+              command("M291",
+                      R: "Cannot Home Z",
+                      P: "Tool must be deselected before homing. The tool has been unlocked, manually dock it and press OK to continue or Cancel to abort",
+                      S: 3),
+              command("M98", P: "homeu.g"))
+    f << meta("if sensors.probes[0].value[0] != 0",
+              command("M291",
+                      R: "Cannot Home Z",
+                      P: "Z probe is already triggered!",
+                      S: 2),
+              meta("abort \"Z probe was triggered before homing.\""))
+
+    f << command("M561")                                     # disable mesh compensation
+    f << command("G90")                                      # absolute moves
+    f << command("G1",                                       # go to center
+                 X: Config::Drives::X::SOFT_LIMITS.sum / 2,
+                 Y: Config::Drives::Y::SOFT_LIMITS.sum / 2,
+                 F: Config::Speeds::HOMING_XY)
+    f << command("M558", F: Config::Speeds::HOMING_Z)        # probe speed
+    f << command("G30")                                      # do a single probe here
+    f << command("M558", F: Config::Speeds::HOMING_Z / 10)   # slower
+    f << command("G30")                                      # do a single probe here
+    f << command("G32")                                      # run bed.g
+    f << command("G1",                                       # go back home
+                 X: Config::Drives::X::SOFT_LIMITS[0] + 2,
+                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 1,
+                 F: Config::Speeds::HOMING_XY)
+    f << command("G29", S: 1)                                # enable mesh bed compensation
 end
 
 task :bed do
     f = File.open "bed.g", "w"
+
+    f << command("M561")               # disable mesh compensation
+    i = 0
+    for point in Config::Bed::PROBE_POINTS
+        f << command("G1",             # go to next point
+                     X: point[:X],
+                     Y: point[:Y],
+                     F: Config::Speeds::HOMING_XY)
+        if i == Config::Bed::PROBE_POINTS.length - 1
+            f << command("G30", P: i, Z: -99999, S: i + 1)  # probe and calibrate
+        else
+            f << command("G30", P: i, Z: -99999)            # probe
+        end
+        i += 1
+    end
+    f << command("G29", S: 1)          # enable compensation
 end
 
 task :pause do
     f = File.open "pause.g", "w"
+
+    f << command("M83")                                           # relative extruder moves
+    f << command("G1", E: -3, F: Config::Speeds::PAUSE_RETRACT)   # retract
+    f << command("G91")                                           # relative moves
+    f << command("G1", Z: 30, F: Config::Speeds::PAUSE_Z)         # lower bed
+    f << command("G90")                                           # absolute moves
+    f << command("G1",                                            # move tool out of way
+                 X: Config::Drives::X::SOFT_LIMITS[1] - 10,
+                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 100,
+                 F: Config::Speeds::PAUSE_XY)
 end
 
 task :resume do
     f = File.open "resume.g", "w"
+
+    f << command("G1", R: 1, X: 0, Y: 0, Z: 5, F: Config::Speeds::PAUSE_XY)  # go to postion fo last print move
+    f << command("G1", R: 1, X: 0, Y: 0, Z: 0, F: Config::Speeds::PAUSE_Z)   # lower to print
+    f << command("M83")                                                      # relative extruder moves
+    f << command("G1", E: 3, F: Config::Speeds::PAUSE_RETRACT)               # deretract
 end
 
 task :start do
@@ -293,23 +483,72 @@ end
 
 task :stop do
     f = File.open "stop.g", "w"
+
+    f << command("M83")                                        # relative extruder moves
+    f << command("G1", E: -10, F: Config::Speeds::END_RETRACT) # retract
+    f << command("G91")                                        # relative moves
+    f << command("G1", Z: 2, F: Config::Speeds::PAUSE_Z)       # raise nozzle
+    f << command("G90")                                        # absolute moves
+    f << command("T-1")                                        # park tool
+    f << command("G0",                                         # go back home
+                 X: Config::Drives::X::SOFT_LIMITS[0] + 2,
+                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 1,
+                 F: Config::Speeds::HOMING_XY)
+    for i in 0...Config::Machine::N_TOOLS
+        f << command("G10", P: i, R: -273.15, S: -273.15)      # disable tool heater
+    end
+    f << command("M140", S: -273.15)                           # disable bed heater
+    f << command("M84")                                        # disable steppers
 end
 
 task :tfree do
     for i in 0...Config::Machine::N_TOOLS
         f = File.open "tfree#{i}.g", "w"
+
+        f << command("G91")                                  # relative moves
+        f << command("G1", Z: 2, F: Config::Speeds::PAUSE_Z) # raise nozzle
+        f << command("G90")                                  # absolute moves
+        f << command("G53 G1",                               # go to parking approach position
+                     X: Config::Tools::PARKING_X[i],
+                     Y: Config::Tools::PARKING_APPROACH_Y,
+                     F: Config::Speeds::PARK_XY)
+        f << command("G53 G1",                               # push tool onto parking posts
+                     Y: Config::Tools::PARKING_Y,
+                     F: Config::Speeds::PARK_XY)
+        f << command("M98", P: "/macros/tool_unlock.g")      # unlock the tool
+        f << command("G53 G1",                               # pull away from parked tool
+                     Y: Config::Tools::PARKING_APPROACH_Y,
+                     F: Config::Speeds::PARK_XY)
     end
 end
 
 task :tpre do
     for i in 0...Config::Machine::N_TOOLS
         f = File.open "tpre#{i}.g", "w"
+
+        f << command("G90")                                  # absolute moves
+        f << command("G0",                                   # go to parking approach position
+                     X: Config::Tools::PARKING_X[i],
+                     Y: Config::Tools::PARKING_APPROACH_Y,
+                     F: Config::Speeds::PARK_XY)
+        f << command("G60", S: 0)                            # save current position
     end
 end
 
 task :tpost do
     for i in 0...Config::Machine::N_TOOLS
         f = File.open "tpost#{i}.g", "w"
+
+        f << command("M116", P: i)                           # wait for temp
+        f << command("G90")                                  # absolute moves
+        f << command("G53 G1",                               # move in to pick up tool
+                     Y: Config::Tools::PARKING_Y,
+                     F: Config::Speeds::PARK_XY)
+        f << command("M98", P: "/macros/tool_lock.g")        # lock the tool
+        f << command("G1", R: 2, Z: 0)                       # restore prior Z position (adjust bed height for new tool)
+        f << command("G1", R: 0, Y: 0)                       # pull tool off parking post by restoring saved Y position
+        f << command("G1", R: 0, X: 0)                       # restore prior X position
+        f << command("M106", R: 2)                           # restore cooling fan speed
     end
 end
 
