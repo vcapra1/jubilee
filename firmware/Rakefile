@@ -497,6 +497,17 @@ end
 task :start do
     FileUtils.mkdir_p "sys"
     f = File.open "sys/start.g", "w"
+
+    f << meta("if state.currentTool != -1 && move.axes[0].homed && move.axes[1].homed && move.axes[3].homed", # park active tool if possible
+              command("T-1"))
+    f << meta("if !move.axes[3].homed",                        # home U if not already
+              command("G28", U: nil))
+    f << meta("if !move.axes[0].homed || !move.axes[1].homed", # home X and Y if not already
+              command("G28", Y: nil),
+              command("G28", X: nil))
+    f << meta("if !move.axes[2].homed",                        # home Z if not already
+              command("G28", Z: nil))
+    f << command("G29", S: 1)                                  # load mesh heightmap
 end
 
 task :stop do
@@ -506,7 +517,7 @@ task :stop do
     f << command("M83")                                        # relative extruder moves
     f << command("G1", E: -10, F: Config::Speeds::END_RETRACT) # retract
     f << command("G91")                                        # relative moves
-    f << command("G1", Z: 2, F: Config::Speeds::PAUSE_Z)       # raise nozzle
+    f << command("G1", Z: 5, F: Config::Speeds::PAUSE_Z)       # raise nozzle
     f << command("G90")                                        # absolute moves
     f << command("T-1")                                        # park tool
     f << command("G0",                                         # go back home
@@ -517,7 +528,23 @@ task :stop do
         f << command("G10", P: i, R: -273.15, S: -273.15)      # disable tool heater
     end
     f << command("M140", S: -273.15)                           # disable bed heater
-    f << command("M84")                                        # disable steppers
+    f << command("M84", S: 300)                                # disable steppers after 5 mins
+end
+
+task :cancel do
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/cancel.g", "w"
+
+    f << command("T-1")                                        # park tool
+    f << command("G0",                                         # go back home
+                 X: Config::Drives::X::SOFT_LIMITS[0] + 2,
+                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 1,
+                 F: Config::Speeds::HOMING_XY)
+    for i in 0...Config::Machine::N_TOOLS
+        f << command("G10", P: i, R: -273.15, S: -273.15)      # disable tool heater
+    end
+    f << command("M140", S: -273.15)                           # disable bed heater
+    f << command("M84", S: 300)                                # disable steppers after 5 mins
 end
 
 task :tfree do
@@ -530,7 +557,7 @@ task :tfree do
         f << command("G90")                                  # absolute moves
         f << command("G53 G1",                               # go to parking approach position
                      X: Config::Tools::PARKING_X[i],
-                     Y: Config::Tools::PARKING_APPROACH_Y,
+                     Y: Config::Tools::PARKING_APPROACH_Y - Config::Tools::NOZZLE_OFFSETS[i][:Y],
                      F: Config::Speeds::PARK_XY)
         f << command("G53 G1",                               # push tool onto parking posts
                      Y: Config::Tools::PARKING_Y,
@@ -572,11 +599,6 @@ task :tpost do
         f << command("G1", R: 0, X: 0)                       # restore prior X position
         f << command("M106", R: 2)                           # restore cooling fan speed
     end
-end
-
-task :cancel do
-    FileUtils.mkdir_p "sys"
-    f = File.open "sys/cancel.g", "w"
 end
 
 task :tool_lock do
