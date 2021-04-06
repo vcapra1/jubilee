@@ -1,11 +1,12 @@
 require 'time'
 require 'json'
+require 'fileutils'
 
 require_relative "config.rb"
 
 HEAT_PIN_NAMES = [
-    "bedheat", "e0heat", "e1heat", "!duex.e2heat", "!duex.e3heat",
-    "!duex.e4heat", "!duex.e5heat", "!duex.e6heat"
+    "bedheat", "e0heat", "e1heat", "duex.e2heat", "duex.e3heat",
+    "duex.e4heat", "duex.e5heat", "duex.e6heat"
 ]
 
 TEMP_PIN_NAMES = [
@@ -67,7 +68,8 @@ def blank
 end
 
 task :config do
-    f = File.open "config.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/config.g", "w"
 
     f << comment("Jubilee Config File for RepRapFirmware 3")
 
@@ -129,8 +131,8 @@ task :config do
                  X: Config::Drives::X::MICROSTEPPING,
                  Y: Config::Drives::Y::MICROSTEPPING,
                  Z: Config::Drives::Z::MICROSTEPPING,
-                 E: Config::Drives::U::MICROSTEPPING,
-                 U: Config::Drives::E::MICROSTEPPING,
+                 U: Config::Drives::U::MICROSTEPPING,
+                 E: Config::Drives::E::MICROSTEPPING,
                  I: 1)
     f << command("M906",                              # Set motor currents in mA, and idle percentage
                  X: Config::Drives::X::MAX_CURRENT,
@@ -205,6 +207,7 @@ task :config do
                  S: Config::Thermistors::Bed::NUM,
                  P: TEMP_PIN_NAMES[Config::Thermistors::Bed::NUM],
                  Y: "thermistor",
+                 A: "Bed",
                  T: Config::Thermistors::Bed::T,
                  B: Config::Thermistors::Bed::B,
                  R: Config::Thermistors::Bed::R)
@@ -222,6 +225,7 @@ task :config do
                      S: Config::Thermistors::Extruders::NUMS[i],
                      P: TEMP_PIN_NAMES[Config::Thermistors::Extruders::NUMS[i]],
                      Y: "thermistor",
+                     A: "E#{i + 1}",
                      T: Config::Thermistors::Extruders::T,
                      B: Config::Thermistors::Extruders::B,
                      R: Config::Thermistors::Extruders::R)
@@ -237,7 +241,7 @@ task :config do
                      C: FAN_PIN_NAMES[Config::Fans::END_FAN_PINS[i]])
         f << command("M106",                                                     # Enable thermostatic control on hotend fan
                      P: Config::Fans::END_FAN_PINS[i],
-                     H: Config::Heaters::Extruders::NUMS[i],
+                     H: Config::Thermistors::Extruders::NUMS[i],
                      T: Config::Fans::HE_ON_TEMP)
         f << command("M143", H: Config::Heaters::Extruders::NUMS[i], S: Config::Heaters::Extruders::MAX_TEMP) # Max hotend temp
     end
@@ -272,7 +276,8 @@ task :config do
 end
 
 task :homeall do
-    f = File.open "homeall.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/homeall.g", "w"
 
     f << command("G91")                    # relative moves
     f << command("G1", Z: 5, F: 800, H: 2) # lift z
@@ -283,12 +288,15 @@ task :homeall do
 end
 
 task :homeu do
-    f = File.open "homeu.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/homeu.g", "w"
 
     f << command("G90")                        # absolute moves
     f << command("G92", U: 0)                  # set curr pos as 0
-    f << command("G1", U: 5, H: 2, F: 5000)    # move 2 degrees off switch
-    f << command("G1", U: 120, H: 1, F: 5000)  # move to 170deg, or until switch is triggered
+    f << command("G1", U: 5, H: 2,             # move 2 degrees off switch
+                 F: Config::Speeds::LOCK_SPEED)
+    f << command("G1", U: 120, H: 1,           # move to 170deg, or until switch is triggered
+                 F: Config::Speeds::LOCK_SPEED)
     f << command("M400")                       # wait for move to complete
 
     f << meta("if abs(move.axes[3].userPosition - 120) > 1",
@@ -300,14 +308,18 @@ task :homeu do
     f << command("T-1 P0")                     # deselect tool without moving
 
     f << command("G91")                        # relative moves
-    f << command("G1", U: -360, F: 9000, H: 1) # go to endstop
-    f << command("G1", U: 6, F: 600)           # back off endstop
-    f << command("G1", U: -15, F: 600, H: 1)   # go to endstop slowly
+    f << command("G1", U: -360, H: 1,          # go to endstop
+                 F: Config::Speeds::LOCK_SPEED)
+    f << command("G1", U: 6,                   # back off endstop
+                 F: Config::Speeds::LOCK_SPEED / 2)
+    f << command("G1", U: -15, H: 1,           # go to endstop slowly
+                 F: Config::Speeds::LOCK_SPEED / 2)
     f << command("G90")                        # absolute moves
 end
 
 task :homex do
-    f = File.open "homex.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/homex.g", "w"
 
     f << command("G90") # absolute moves
     f << meta("if !move.axes[3].homed",      # Make sure the lock actuator is homed
@@ -359,7 +371,8 @@ task :homex do
 end
 
 task :homey do
-    f = File.open "homey.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/homey.g", "w"
 
     f << meta("if sensors.endstops[1].triggered",  # Make sure the endstop isn't already triggered (could be broken wire)
               command("M291",
@@ -387,7 +400,8 @@ task :homey do
 end
 
 task :homez do
-    f = File.open "homez.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/homez.g", "w"
 
     f << meta("if !move.axes[3].homed", # check u
               command("M291",
@@ -435,7 +449,8 @@ task :homez do
 end
 
 task :bed do
-    f = File.open "bed.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/bed.g", "w"
 
     f << command("M561")               # disable mesh compensation
     i = 0
@@ -455,7 +470,8 @@ task :bed do
 end
 
 task :pause do
-    f = File.open "pause.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/pause.g", "w"
 
     f << command("M83")                                           # relative extruder moves
     f << command("G1", E: -3, F: Config::Speeds::PAUSE_RETRACT)   # retract
@@ -469,7 +485,8 @@ task :pause do
 end
 
 task :resume do
-    f = File.open "resume.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/resume.g", "w"
 
     f << command("G1", R: 1, X: 0, Y: 0, Z: 5, F: Config::Speeds::PAUSE_XY)  # go to postion fo last print move
     f << command("G1", R: 1, X: 0, Y: 0, Z: 0, F: Config::Speeds::PAUSE_Z)   # lower to print
@@ -478,11 +495,13 @@ task :resume do
 end
 
 task :start do
-    f = File.open "start.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/start.g", "w"
 end
 
 task :stop do
-    f = File.open "stop.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/stop.g", "w"
 
     f << command("M83")                                        # relative extruder moves
     f << command("G1", E: -10, F: Config::Speeds::END_RETRACT) # retract
@@ -503,7 +522,8 @@ end
 
 task :tfree do
     for i in 0...Config::Machine::N_TOOLS
-        f = File.open "tfree#{i}.g", "w"
+        FileUtils.mkdir_p "sys"
+        f = File.open "sys/tfree#{i}.g", "w"
 
         f << command("G91")                                  # relative moves
         f << command("G1", Z: 2, F: Config::Speeds::PAUSE_Z) # raise nozzle
@@ -524,7 +544,8 @@ end
 
 task :tpre do
     for i in 0...Config::Machine::N_TOOLS
-        f = File.open "tpre#{i}.g", "w"
+        FileUtils.mkdir_p "sys"
+        f = File.open "sys/tpre#{i}.g", "w"
 
         f << command("G90")                                  # absolute moves
         f << command("G0",                                   # go to parking approach position
@@ -537,7 +558,8 @@ end
 
 task :tpost do
     for i in 0...Config::Machine::N_TOOLS
-        f = File.open "tpost#{i}.g", "w"
+        FileUtils.mkdir_p "sys"
+        f = File.open "sys/tpost#{i}.g", "w"
 
         f << command("M116", P: i)                           # wait for temp
         f << command("G90")                                  # absolute moves
@@ -553,11 +575,44 @@ task :tpost do
 end
 
 task :cancel do
-    f = File.open "cancel.g", "w"
+    FileUtils.mkdir_p "sys"
+    f = File.open "sys/cancel.g", "w"
+end
+
+task :tool_lock do
+    FileUtils.mkdir_p "macros"
+    f = File.open "macros/tool_lock.g", "w"
+
+    f << command("G91")    # relative moves
+    f << command("G1",     # back off limit switch
+                 U: 10,
+                 H: 0,
+                 F: Config::Speeds::LOCK_SPEED)
+    f << command("G1",     # go to torque limit switch, locking tool
+                 U: 200,
+                 H: 1,
+                 F: Config::Speeds::LOCK_SPEED)
+    f << command("G90")    # absolute moves
+end
+
+task :tool_unlock do
+    FileUtils.mkdir_p "macros"
+    f = File.open "macros/tool_unlock.g", "w"
+
+    f << command("G91")    # relative moves
+    f << command("G1",     # back off limit switch
+                 U: -4,
+                 H: 2,
+                 F: Config::Speeds::LOCK_SPEED)
+    f << command("G1",     # go to home limit switch, unlocking tool
+                 U: -360,
+                 H: 1,
+                 F: Config::Speeds::LOCK_SPEED)
+    f << command("G90")    # absolute moves
 end
 
 task :clean do
-    `rm *.g`
+    `rm -rf sys macros`
 end
 
-task :default => [:config, :homeall, :homeu, :homex, :homey, :homez, :bed, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel]
+task :default => [:config, :homeall, :homeu, :homex, :homey, :homez, :bed, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel, :tool_lock, :tool_unlock]

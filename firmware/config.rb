@@ -51,7 +51,7 @@ module Config
             MAX_SPEED = 15000
             MAX_ACCEL = 1000
             MAX_JERK = 500
-            SOFT_LIMITS = [-44, 320]
+            SOFT_LIMITS = [-43, 321]
         end
         module Z
             NUMBERS = [7, 8, 9]
@@ -65,7 +65,7 @@ module Config
             SOFT_LIMITS = [-0.5, 220]
         end
         module E
-            NUMBERS = [6, 5, 4, 3]
+            NUMBERS = [4, 3, 6, 5]
             DIR = 0
             MICROSTEPPING = 16
             STEPS_PER_MM = 820
@@ -78,8 +78,8 @@ module Config
         module U
             NUMBER = 2
             DIR = 1
-            MICROSTEPPING = 4
-            STEPS_PER_DEG = 30.578
+            MICROSTEPPING = 16
+            STEPS_PER_DEG = 45.716
             MAX_CURRENT = 900
             MAX_SPEED = 10000
             MAX_ACCEL = 1000
@@ -113,7 +113,7 @@ module Config
 
     module Thermistors
         module Extruders
-            NUMS = [1, 2, 3, 4]
+            NUMS = [3, 4, 5, 6]
             T = 100000
             B = 3950
             R = 4700
@@ -128,7 +128,7 @@ module Config
 
     module Heaters
         module Extruders
-            NUMS = [1, 2, 3, 4]
+            NUMS = [4, 5, 6, 7]
             MAX_TEMP = 265
         end
         module Bed
@@ -146,15 +146,15 @@ module Config
     module Tools
         # Note: offset is from the Z probe
         NOZZLE_OFFSETS = [
-            {X: -5, Y: 44, Z: 0}, # E1
-            {X: -5, Y: 44, Z: 0}, # E2
-            {X: -5, Y: 44, Z: 0}, # E3
-            {X: -5, Y: 44, Z: 0}  # E4
+            {X: -5, Y: 43, Z: 0}, # E1
+            {X: -5, Y: 43, Z: 0}, # E2
+            {X: -5, Y: 43, Z: 0}, # E3
+            {X: -5, Y: 43, Z: -4.27}  # E4
         ]
 
         PARKING_X = [11, 102.7, 194.3, 286]
-        PARKING_APPROACH_Y = 284
-        PARKING_Y = 320
+        PARKING_APPROACH_Y = 285
+        PARKING_Y = 321
     end
 
     module Speeds
@@ -166,6 +166,7 @@ module Config
         PAUSE_RETRACT = 2500
         END_RETRACT = 8000
         PARK_XY = 3000
+        LOCK_SPEED = 1600
     end
 end
 
