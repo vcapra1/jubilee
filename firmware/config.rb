@@ -115,7 +115,7 @@ module Config
         module Extruders
             NUMS = [3, 4, 5, 6]
             T = 100000
-            B = 3950
+            B = 4725
             R = 4700
         end
         module Bed
@@ -146,13 +146,13 @@ module Config
     module Tools
         # Note: offset is from the Z probe
         NOZZLE_OFFSETS = [
-            {X: -5, Y: 43, Z: 0}, # E1
-            {X: -5, Y: 43, Z: 0}, # E2
-            {X: -5, Y: 43, Z: 0}, # E3
-            {X: -5, Y: 43, Z: -4.27}  # E4
+            {X: -5, Y: 43, Z: -2.47}, # E1
+            {X: -3.5, Y: 43.15, Z: -3.31}, # E2
+            {X: -3.65, Y: 43, Z: -4.54}, # E3
+            {X: -4.5, Y: 43.25, Z: -4.24}  # E4
         ]
 
-        PARKING_X = [11, 102.7, 194.3, 286]
+        PARKING_X = [1, 96.8, 192.7, 288.5]
         PARKING_APPROACH_Y = 285
         PARKING_Y = 321
     end

@@ -479,8 +479,8 @@ task :pause do
     f << command("G1", Z: 30, F: Config::Speeds::PAUSE_Z)         # lower bed
     f << command("G90")                                           # absolute moves
     f << command("G1",                                            # move tool out of way
-                 X: Config::Drives::X::SOFT_LIMITS[1] - 10,
-                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 100,
+                 X: Config::Drives::X::SOFT_LIMITS[1] - 35,       # X pause coordinate, allow space for the fan
+                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 100,      # Y pause coordinate, around the middle
                  F: Config::Speeds::PAUSE_XY)
 end
 
@@ -498,6 +498,11 @@ task :start do
     FileUtils.mkdir_p "sys"
     f = File.open "sys/start.g", "w"
 
+    f << meta("if sensors.analog[0].lastReading < 40",
+              command("M291",
+                      R: "Cold Print Surface",
+                      P: "The bed is below 40C.  Click OK to proceed with print on cold bed, or Cancel to abort.",
+                      S: 3))
     f << meta("if state.currentTool != -1 && move.axes[0].homed && move.axes[1].homed && move.axes[3].homed", # park active tool if possible
               command("T-1"))
     f << meta("if !move.axes[3].homed",                        # home U if not already
@@ -596,7 +601,6 @@ task :tpost do
         f << command("M98", P: "/macros/tool_lock.g")        # lock the tool
         f << command("G1", R: 2, Z: 0)                       # restore prior Z position (adjust bed height for new tool)
         f << command("G1", R: 0, Y: 0)                       # pull tool off parking post by restoring saved Y position
-        f << command("G1", R: 0, X: 0)                       # restore prior X position
         f << command("M106", R: 2)                           # restore cooling fan speed
     end
 end
