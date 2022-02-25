@@ -3,11 +3,11 @@ module Config
         NAME = "Jubilee"
         LOG = "eventlog.txt"
         N_TOOLS = 4
-        PASSWORD = "twentyonefortytwo"
+        PASSWORD = "reprap" # set to "reprap" to disable
     end
 
     module Network
-        ADDR = "192.168.0.11"
+        ADDR = "192.168.1.11"
         NETMASK = "255.255.255.0"
         GATEWAY = "192.168.0.255"
     end
@@ -24,7 +24,7 @@ module Config
         MESH_X_BOUNDS = [10, 282]
         MESH_Y_BOUNDS = [5, 281]
         MESH_SIZE = 10
-        PROBE_DIVE = 5
+        PROBE_DIVE = 2
         PROBE_SPEED = 3000
         PROBE_TOLERANCE = 0.02
     end
@@ -130,10 +130,12 @@ module Config
         module Extruders
             NUMS = [4, 5, 6, 7]
             MAX_TEMP = 265
+            DEFAULT_TEMP = 175
         end
         module Bed
             NUM = 0
             MAX_TEMP = 120
+            DEFAULT_TEMP = 60
         end
     end
 
@@ -147,26 +149,28 @@ module Config
         # Note: offset is from the Z probe
         NOZZLE_OFFSETS = [
             {X: -5, Y: 43, Z: -2.47}, # E1
-            {X: -3.5, Y: 43.15, Z: -3.31}, # E2
+            {X: -3.5, Y: 43.55, Z: -3.31}, # E2
             {X: -3.65, Y: 43, Z: -4.54}, # E3
-            {X: -4.5, Y: 43.25, Z: -4.24}  # E4
+            {X: -4.55, Y: 43.45, Z: -4.24}  # E4
         ]
 
         PARKING_X = [1, 96.8, 192.7, 288.5]
         PARKING_APPROACH_Y = 285
         PARKING_Y = 321
+        PRIME_LENGTH = 90
     end
 
     module Speeds
         # All speeds in mm/min unless otherwise noted
-        HOMING_XY = 3000
+        HOMING_XY = 15000
         HOMING_Z = 500
         PAUSE_XY = 3000
         PAUSE_Z = 500
         PAUSE_RETRACT = 2500
         END_RETRACT = 8000
-        PARK_XY = 3000
-        LOCK_SPEED = 1600
+        PARK_XY = 12000
+        LOCK_SPEED = 5000
+        PRIME = 1500
     end
 end
 

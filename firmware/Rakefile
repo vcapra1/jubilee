@@ -478,17 +478,17 @@ task :pause do
     f << command("G91")                                           # relative moves
     f << command("G1", Z: 30, F: Config::Speeds::PAUSE_Z)         # lower bed
     f << command("G90")                                           # absolute moves
-    f << command("G1",                                            # move tool out of way
-                 X: Config::Drives::X::SOFT_LIMITS[1] - 35,       # X pause coordinate, allow space for the fan
-                 Y: Config::Drives::Y::SOFT_LIMITS[0] + 100,      # Y pause coordinate, around the middle
-                 F: Config::Speeds::PAUSE_XY)
+    #f << command("G1",                                            # move tool out of way
+    #             X: Config::Drives::X::SOFT_LIMITS[1] - 35,       # X pause coordinate, allow space for the fan
+    #             Y: Config::Drives::Y::SOFT_LIMITS[0] + 100,      # Y pause coordinate, around the middle
+    #             F: Config::Speeds::PAUSE_XY)
 end
 
 task :resume do
     FileUtils.mkdir_p "sys"
     f = File.open "sys/resume.g", "w"
 
-    f << command("G1", R: 1, X: 0, Y: 0, Z: 5, F: Config::Speeds::PAUSE_XY)  # go to postion fo last print move
+    f << command("G1", R: 1, X: 0, Y: 0, F: Config::Speeds::PAUSE_XY)        # go to postion fo last print move
     f << command("G1", R: 1, X: 0, Y: 0, Z: 0, F: Config::Speeds::PAUSE_Z)   # lower to print
     f << command("M83")                                                      # relative extruder moves
     f << command("G1", E: 3, F: Config::Speeds::PAUSE_RETRACT)               # deretract
@@ -560,14 +560,14 @@ task :tfree do
         f << command("G91")                                  # relative moves
         f << command("G1", Z: 2, F: Config::Speeds::PAUSE_Z) # raise nozzle
         f << command("G90")                                  # absolute moves
-        f << command("G53 G1",                               # go to parking approach position
+        f << command("G53 G0",                               # go to parking approach position
                      X: Config::Tools::PARKING_X[i],
                      Y: Config::Tools::PARKING_APPROACH_Y - Config::Tools::NOZZLE_OFFSETS[i][:Y],
                      F: Config::Speeds::PARK_XY)
         f << command("G53 G1",                               # push tool onto parking posts
                      Y: Config::Tools::PARKING_Y,
                      F: Config::Speeds::PARK_XY)
-        f << command("M98", P: "/macros/tool_unlock.g")      # unlock the tool
+        f << command("M98", P: "/macros/toolchanger/tool_unlock.g")      # unlock the tool
         f << command("G53 G1",                               # pull away from parked tool
                      Y: Config::Tools::PARKING_APPROACH_Y,
                      F: Config::Speeds::PARK_XY)
@@ -598,16 +598,18 @@ task :tpost do
         f << command("G53 G1",                               # move in to pick up tool
                      Y: Config::Tools::PARKING_Y,
                      F: Config::Speeds::PARK_XY)
-        f << command("M98", P: "/macros/tool_lock.g")        # lock the tool
-        f << command("G1", R: 2, Z: 0)                       # restore prior Z position (adjust bed height for new tool)
+        f << command("M98", P: "/macros/toolchanger/tool_lock.g")        # lock the tool
+        f << command("G1", R: 2, Z: 2)                       # restore prior Z position (adjust bed height for new tool) plus 2
         f << command("G1", R: 0, Y: 0)                       # pull tool off parking post by restoring saved Y position
+        f << command("G1", R: 2, X: 0, Y: 0)                 # restore prior XY position (to avoid hitting parts while moving)
+        f << command("G1", R: 2, Z: 0)                       # restore prior Z position (adjust bed height for new tool)
         f << command("M106", R: 2)                           # restore cooling fan speed
     end
 end
 
 task :tool_lock do
-    FileUtils.mkdir_p "macros"
-    f = File.open "macros/tool_lock.g", "w"
+    FileUtils.mkdir_p "macros/toolchanger"
+    f = File.open "macros/toolchanger/tool_lock.g", "w"
 
     f << command("G91")    # relative moves
     f << command("G1",     # back off limit switch
@@ -622,8 +624,8 @@ task :tool_lock do
 end
 
 task :tool_unlock do
-    FileUtils.mkdir_p "macros"
-    f = File.open "macros/tool_unlock.g", "w"
+    FileUtils.mkdir_p "macros/toolchanger"
+    f = File.open "macros/toolchanger/tool_unlock.g", "w"
 
     f << command("G91")    # relative moves
     f << command("G1",     # back off limit switch
@@ -637,8 +639,52 @@ task :tool_unlock do
     f << command("G90")    # absolute moves
 end
 
+task :preheat do
+    for i in 0...Config::Machine::N_TOOLS
+        FileUtils.mkdir_p "macros/preheat"
+        f = File.open "macros/preheat/preheat_t#{i}.g", "w"
+
+        f << meta("var prev_tool = state.currentTool")    # store current tool so we can switch back to it at the end
+        f << command("G10",                               # set temps
+                     P: i,
+                     S: Config::Heaters::Extruders::DEFAULT_TEMP,
+                     R: Config::Heaters::Extruders::DEFAULT_TEMP)
+        f << command("T#{i} P0")                          # switch to the tool to preheat, but do not run any macros
+        f << command("T{var.prev_tool} P0")               # switch back to the original tool, again without running macros
+    end
+
+    FileUtils.mkdir_p "macros/preheat"
+    f = File.open "macros/preheat/preheat_bed.g", "w"
+
+    f << command("M140",                                  # set bed temps
+                 S: Config::Heaters::Bed::DEFAULT_TEMP,
+                 R: 0)
+end
+
+task :prime do
+    for i in 0...Config::Machine::N_TOOLS
+        FileUtils.mkdir_p "macros/prime"
+        f = File.open "macros/prime/prime_t#{i}.g", "w"
+
+        f << meta("var prev_tool = state.currentTool")    # store current tool so we can switch back to it at the end
+        f << meta("if heat.heaters[#{Config::Heaters::Extruders::NUMS[i]}].current > heat.coldExtrudeTemperature",
+                  command("T#{i} P0"),                    # switch to the tool to prime, but do not run any macros
+                  command("M83"),                         # set extruder to relative mode
+                  command("G1", E: Config::Tools::PRIME_LENGTH, F: Config::Speeds::PRIME),
+                  command("M82"),                         # set extruder to absolute mode
+                  command("T{var.prev_tool} P0"))         # switch back to the original tool, again without running macros
+    end
+
+    FileUtils.mkdir_p "macros/prime"
+    f = File.open "macros/prime/prime_all.g", "w"
+
+    for i in 0...Config::Machine::N_TOOLS
+        f << command("M98", P: "/macros/prime/prime_t#{i}.g")
+    end
+end
+
 task :clean do
     `rm -rf sys macros`
 end
 
-task :default => [:config, :homeall, :homeu, :homex, :homey, :homez, :bed, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel, :tool_lock, :tool_unlock]
+task :default => [:config, :homeall, :homeu, :homex, :homey, :homez, :bed, :pause, :resume, :start, :stop, :tfree, :tpre, :tpost, :cancel, :tool_lock, :tool_unlock, :preheat, :prime]
